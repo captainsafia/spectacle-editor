@@ -9,12 +9,26 @@
 
 .listWrapper {
   overflow-y: scroll;
-  overflow-x: hidden;
+  overflow-x: visible;
+}
+
+.dropIndicator {
+  position: absolute;
+  top: 20px;
+  right: 180px;
+  width: 5px;
+  height: 100px;
+  background: #447bdc;
+}
+
+.slideOuter {
+  position: relative;
+  padding: 20px;
 }
 
 .slideWrapper {
-  width: 150px;
-  height: 65px;
-  background-color: #333;
+  width: 140px;
+  height: 100px;
+  background-color: white;
   position: relative;
 }

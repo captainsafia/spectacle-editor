@@ -1,16 +1,17 @@
 import React, { Component } from "react";
 // import { findDOMNode } from "react-dom";
-import { autorun } from "mobx";
+import { autorun, observable } from "mobx";
+import { observer } from "mobx-react";
 import { Motion, TransitionMotion, spring } from "react-motion";
 
 import SlideMenu from "./slide-menu";
 import styles from "./index.css";
 
 // NOTE: These must match up to the actual styles.
-const slideHeight = 65;
+const slideHeight = 100;
 // NOTE: These are half the value since vertical margins collapse
-const slideTopMargin = 5;
-const slideBottomMargin = 5;
+const slideTopMargin = 20;
+const slideBottomMargin = 20;
 // Vertical margins collapse so add one more topMargin to the start.
 const listTop = 190 + slideTopMargin; // default value will be overwritten on mount
 const listBottom = 900;
@@ -37,7 +38,12 @@ const getDragIndex = (topOfSlide, currentDragIndex, scrollTop) => {
   return index;
 };
 
+const DropIndicator = () => <div className={styles.dropIndicator}/>;
+
+@observer
 class SlideList extends Component {
+  @observable isDragging = false;
+
   static contextTypes = {
     store: React.PropTypes.object
   };
@@ -101,8 +107,13 @@ class SlideList extends Component {
       mouseStart: [x, y],
       currentDragIndex,
       originalDragIndex,
-      scrollTop
+      scrollTop,
+      isPressed
     } = this.state;
+
+    if (isPressed && !this.isDragging) {
+      this.isDragging = true;
+    }
 
     const listWrapper = this.listWrapper;
     const newScrollTop = listWrapper.scrollTop;
@@ -234,6 +245,8 @@ class SlideList extends Component {
     // TODO: allow for animations to take place before updating the store
     this.setState(state, () => {
       setTimeout(() => {
+        this.isDragging = false;
+
         this.setState({
           currentDragIndex: null,
           originalDragIndex: null,
@@ -271,14 +284,14 @@ class SlideList extends Component {
           willLeave={() => ({
             left: spring(-200, springSetting2),
             height: spring(0, springSetting2),
-            padding: spring(0, springSetting2)
+            padding: 0
           })}
           willEnter={() => ({
             left: -200
           })}
           styles={this.state.slideList.map(slide => ({
             key: `${slide.id}key`,
-            style: { left: spring(0), height: slideHeight, padding: 5 },
+            style: { left: spring(0), height: slideHeight },
             data: slide
           }))}
         >
@@ -308,7 +321,7 @@ class SlideList extends Component {
                       translateX: updating ? x : spring(x, springSetting2),
                       translateY: updating ? y : spring(y, springSetting2),
                       scale: updating ? 1 : spring(isPressed ? 1.1 : 1, springSetting1),
-                      zIndex: isPressed ? 1000 : i
+                      zIndex: this.isDragging ? 1000 : i
                     };
                   } else {
                     y = (visualIndex - i) * totalSlideHeight;
@@ -322,10 +335,19 @@ class SlideList extends Component {
                     };
                   }
 
-                  const borderStyle = currentSlideIndex === i ? "solid 1px #fff" : "0px";
+                  const bgColor = currentSlideIndex === i && !this.isDragging ? "#ebf5ff" : "transparent";
+                  const borderStyle = currentSlideIndex === i ?
+                    "1px solid #447bdc" :
+                    "1px solid transparent";
 
                   return (
-                    <div key={key} style={{ ...style, position: "relative" }}>
+                    <div key={key} className={styles.slideOuter} style={{
+                      ...style,
+                      backgroundColor: bgColor
+                    }}>
+
+                    { currentDragIndex === i && <DropIndicator/> }
+
                     <Motion style={motionStyle}>
                       {({ translateY, translateX, scale, zIndex }) => (
                         <div
@@ -335,8 +357,8 @@ class SlideList extends Component {
                           onTouchStart={this.handleTouchStart.bind(this, data.id, i)}
                           style={{
                             zIndex,
-                            backgroundColor: data.color,
                             border: borderStyle,
+                            position: isPressed ? "fixed" : "relative",
                             transform: `
                               translate3d(${translateX}px,
                               ${translateY}px, 0)

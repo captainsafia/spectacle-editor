@@ -12,19 +12,14 @@ const slideHeight = 100;
 // NOTE: These are half the value since vertical margins collapse
 const slideTopMargin = 20;
 const slideBottomMargin = 20;
-// Vertical margins collapse so add one more topMargin to the start.
-let listTop = 190 + slideTopMargin; // default value will be overwritten on mount
-let listBottom = 900;
-let listRight = 155;
-let listLeft = 5;
+
 const totalSlideHeight = slideHeight + slideTopMargin + slideBottomMargin;
 
 const springSetting1 = { stiffness: 180, damping: 10 };
 const springSetting2 = { stiffness: 1000, damping: 50 };
 
-// NOTE: If dragging hits perf issues, memoize this function
-const getDragIndex = (topOfSlide, currentDragIndex, scrollTop) => {
-  const effectiveTop = topOfSlide - listTop + scrollTop;
+const getDragIndex = (topOfSlide, currentDragIndex, scrollTop, listRect) => {
+  const effectiveTop = topOfSlide - listRect.top + scrollTop;
   const interSlideTop = effectiveTop % totalSlideHeight;
 
   let index = Math.floor(effectiveTop / totalSlideHeight);
@@ -50,7 +45,6 @@ class SlideList extends Component {
   constructor(props, context) {
     super(props);
 
-    // TODO: Make sure default state is representative of actual state
     this.state = {
       slideList: context.store.slides,
       mouseOffset: null,
@@ -75,22 +69,13 @@ class SlideList extends Component {
         updating: false
       });
     });
-
-    setTimeout(() => {
-      const listRect = this.listWrapper.getBoundingClientRect();
-      listTop = listRect.top;
-      listBottom = listRect.bottom;
-      listLeft = listRect.left;
-      listRight = listRect.right;
-    }, 200);
   }
 
   componentDidUpdate = () => {
     const { scrollAmount } = this.state;
-    const listWrapper = this.listWrapper;
 
     if (scrollAmount) {
-      listWrapper.scrollTop += scrollAmount;
+      this.listWrapper.scrollTop += scrollAmount;
     }
   }
 
@@ -102,24 +87,25 @@ class SlideList extends Component {
       mouseStart: [x, y],
       currentDragIndex,
       originalDragIndex,
-      scrollTop,
       isPressed
     } = this.state;
+
+    const scrollTop = this.listWrapper.scrollTop;
+    const listRect = this.listWrapper.getBoundingClientRect();
 
     if (isPressed && !this.isDragging) {
       this.isDragging = true;
     }
 
-    const listWrapper = this.listWrapper;
-    const newScrollTop = listWrapper.scrollTop;
+    const newScrollTop = this.listWrapper.scrollTop;
     const topOfSlide = pageY + mouseOffset.top;
     const bottomOfSlide = topOfSlide + slideHeight;
     const leftOfSlide = pageX + mouseOffset.left;
     const rightOfSlide = pageX + mouseOffset.right;
-    const listWrapperHeight = listWrapper.clientHeight;
+    const listWrapperHeight = this.listWrapper.clientHeight;
     const scrollArea = listWrapperHeight / 5 > 30 ? listWrapperHeight / 5 : 30;
-    const topScroll = listTop + scrollArea;
-    const bottomScroll = listTop + listWrapperHeight - scrollArea;
+    const topScroll = listRect.top + scrollArea;
+    const bottomScroll = listRect.top + listWrapperHeight - scrollArea;
     const scrolled = newScrollTop - scrollTop;
     const newDelta = [pageX - x, pageY - y + scrolled];
 
@@ -133,7 +119,7 @@ class SlideList extends Component {
       scrollAmount = null;
     }
     // Let the slide overflow halfway for the zero index location.
-    if (topOfSlide < listTop && topOfSlide > listTop - (slideHeight / 2)) {
+    if (topOfSlide < listRect.top && topOfSlide > listRect.top - (slideHeight / 2)) {
       this.setState({
         delta: newDelta,
         currentDragIndex: 0,
@@ -146,22 +132,23 @@ class SlideList extends Component {
 
     // If we're outside of the column, setState to outside
     if (
-      rightOfSlide < listLeft ||
-      leftOfSlide > listRight ||
-      topOfSlide > listBottom ||
-      topOfSlide < listTop
+      rightOfSlide < listRect.left ||
+      leftOfSlide > listRect.right ||
+      topOfSlide > listRect.bottom ||
+      topOfSlide < listRect.top
     ) {
       this.setState({
         delta: newDelta,
         outside: true,
         scrollAmount,
+        scrollTop,
         currentDragIndex: originalDragIndex
       });
 
       return;
     }
 
-    let newIndex = getDragIndex(topOfSlide, currentDragIndex, newScrollTop);
+    let newIndex = getDragIndex(topOfSlide, currentDragIndex, newScrollTop, listRect);
 
     // Safety check
     if (newIndex > slideList.length) {
@@ -171,6 +158,7 @@ class SlideList extends Component {
     this.setState({
       delta: newDelta,
       currentDragIndex: newIndex,
+      scrollTop,
       outside: false
     });
   }

@@ -10,15 +10,26 @@
 .listWrapper {
   overflow-y: scroll;
   overflow-x: visible;
+  z-index: 100;
+  flex: 1;
 }
 
 .dropIndicator {
   position: absolute;
   top: 20px;
-  right: 180px;
-  width: 5px;
+  left: 60px;
+  width: 3px;
   height: 100px;
   background: #447bdc;
+}
+
+.slideIndex {
+  position: absolute;
+  bottom: 3px;
+  left: -40px;
+  width: 30px;
+  text-align: right;
+  color: var(--tertiary-font-color);
 }
 
 .slideOuter {

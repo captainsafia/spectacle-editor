@@ -1,5 +1,5 @@
 import React, { Component } from "react";
-// import { findDOMNode } from "react-dom";
+import { findDOMNode } from "react-dom";
 import { autorun, observable } from "mobx";
 import { observer } from "mobx-react";
 import { Motion, TransitionMotion, spring } from "react-motion";
@@ -13,10 +13,10 @@ const slideHeight = 100;
 const slideTopMargin = 20;
 const slideBottomMargin = 20;
 // Vertical margins collapse so add one more topMargin to the start.
-const listTop = 190 + slideTopMargin; // default value will be overwritten on mount
-const listBottom = 900;
-const listRight = 155;
-const listLeft = 5;
+let listTop = 190 + slideTopMargin; // default value will be overwritten on mount
+let listBottom = 900;
+let listRight = 155;
+let listLeft = 5;
 const totalSlideHeight = slideHeight + slideTopMargin + slideBottomMargin;
 
 const springSetting1 = { stiffness: 180, damping: 10 };
@@ -34,11 +34,10 @@ const getDragIndex = (topOfSlide, currentDragIndex, scrollTop) => {
   } else if (index > currentDragIndex && interSlideTop <= slideTopMargin) {
     index -= 1;
   }
-
   return index;
 };
 
-const DropIndicator = () => <div className={styles.dropIndicator}/>;
+const DropIndicator = () => <div className={styles.dropIndicator} />;
 
 @observer
 class SlideList extends Component {
@@ -77,8 +76,13 @@ class SlideList extends Component {
       });
     });
 
-    // TODO: Why does this give an incorrect boundingRectTop?
-    // listTop = findDOMNode(this).getBoundingClientRect().top + slideTopMargin;
+    setTimeout(() => {
+      const listRect = this.listWrapper.getBoundingClientRect();
+      listTop = listRect.top;
+      listBottom = listRect.bottom;
+      listLeft = listRect.left;
+      listRight = listRect.right;
+    }, 200);
   }
 
   componentDidUpdate = () => {
@@ -90,15 +94,6 @@ class SlideList extends Component {
     }
   }
 
-  handleTouchStart = (id, pressLocation, ev) => {
-    ev.preventDefault();
-    this.handleMouseDown(id, pressLocation, ev.touches[0]);
-  }
-
-  handleTouchMove = (ev) => {
-    ev.preventDefault();
-    this.handleMouseMove(ev.touches[0]);
-  }
 
   handleMouseMove = ({ pageX, pageY }) => {
     const {
@@ -137,14 +132,13 @@ class SlideList extends Component {
     } else {
       scrollAmount = null;
     }
-
     // Let the slide overflow halfway for the zero index location.
     if (topOfSlide < listTop && topOfSlide > listTop - (slideHeight / 2)) {
       this.setState({
         delta: newDelta,
         currentDragIndex: 0,
-        outside: false,
-        scrollAmount
+        scrollAmount,
+        outside: false
       });
 
       return;
@@ -160,8 +154,8 @@ class SlideList extends Component {
       this.setState({
         delta: newDelta,
         outside: true,
-        currentDragIndex: originalDragIndex,
-        scrollAmount
+        scrollAmount,
+        currentDragIndex: originalDragIndex
       });
 
       return;
@@ -177,8 +171,7 @@ class SlideList extends Component {
     this.setState({
       delta: newDelta,
       currentDragIndex: newIndex,
-      outside: false,
-      scrollAmount
+      outside: false
     });
   }
 
@@ -188,10 +181,8 @@ class SlideList extends Component {
     const { pageX, pageY } = ev;
     const { top, right, bottom, left } = this[id].getBoundingClientRect();
     const scrollTop = this.listWrapper.scrollTop;
-
     this.context.store.setSelectedSlideIndex(index);
     window.addEventListener("mouseup", this.handleMouseUp);
-    window.addEventListener("touchend", this.handleMouseUp);
 
     // Only do drag if we hold the mouse down for a bit
     this.mouseClickTimeout = setTimeout(() => {
@@ -213,7 +204,6 @@ class SlideList extends Component {
         scrollTop
       });
 
-      window.addEventListener("touchmove", this.handleTouchMove);
       window.addEventListener("mousemove", this.handleMouseMove);
     }, 300);
   }
@@ -222,15 +212,12 @@ class SlideList extends Component {
     if (this.mouseClickTimeout || this.mouseClickTimeout === 0) {
       clearTimeout(this.mouseClickTimeout);
       window.removeEventListener("mouseup", this.handleMouseUp);
-      window.removeEventListener("touchend", this.handleMouseUp);
 
       this.mouseClickTimeout = null;
 
       return;
     }
 
-    window.removeEventListener("touchmove", this.handleTouchMove);
-    window.removeEventListener("touchend", this.handleMouseUp);
     window.removeEventListener("mousemove", this.handleMouseMove);
     window.removeEventListener("mouseup", this.handleMouseUp);
 
@@ -274,7 +261,8 @@ class SlideList extends Component {
       outside,
       originalDragIndex,
       isPressed,
-      updating
+      updating,
+      scrollTop
     } = this.state;
 
     return (
@@ -284,14 +272,16 @@ class SlideList extends Component {
           willLeave={() => ({
             left: spring(-200, springSetting2),
             height: spring(0, springSetting2),
-            padding: 0
+            padding: spring(0, springSetting2)
           })}
           willEnter={() => ({
-            left: -200
+            left: -200,
+            height: 0,
+            padding: 0
           })}
           styles={this.state.slideList.map(slide => ({
             key: `${slide.id}key`,
-            style: { left: spring(0), height: slideHeight },
+            style: { left: spring(0, springSetting2), height: spring(slideHeight, springSetting2), padding: spring(20, springSetting2) },
             data: slide
           }))}
         >
@@ -315,10 +305,10 @@ class SlideList extends Component {
                   if (i === originalDragIndex) {
                     [x, y] = delta;
 
-                    y = isPressed ? y : (currentDragIndex - i) * totalSlideHeight;
+                    y = isPressed ? y - scrollTop : (currentDragIndex - i) * totalSlideHeight;
 
                     motionStyle = {
-                      translateX: updating ? x : spring(x, springSetting2),
+                      translateX: updating ? x + 40 : spring(x + 40, springSetting2),
                       translateY: updating ? y : spring(y, springSetting2),
                       scale: updating ? 1 : spring(isPressed ? 1.1 : 1, springSetting1),
                       zIndex: this.isDragging ? 1000 : i
@@ -328,25 +318,33 @@ class SlideList extends Component {
                     visualIndex += 1;
 
                     motionStyle = {
-                      translateX: updating ? 0 : spring(0, springSetting2),
+                      translateX: updating ? 40 : spring(40, springSetting2),
                       translateY: updating ? y : spring(y, springSetting2),
                       scale: 1,
                       zIndex: i
                     };
                   }
 
-                  const bgColor = currentSlideIndex === i && !this.isDragging ? "#ebf5ff" : "transparent";
+                  const bgColor = currentSlideIndex === i && !this.isDragging ?
+                    "#ebf5ff" : "transparent";
+
                   const borderStyle = currentSlideIndex === i ?
-                    "1px solid #447bdc" :
-                    "1px solid transparent";
+                    "1px solid #447bdc" : "1px solid transparent";
+
+                  const position = i === originalDragIndex && isPressed ?
+                    "fixed" : "relative";
 
                   return (
-                    <div key={key} className={styles.slideOuter} style={{
-                      ...style,
-                      backgroundColor: bgColor
-                    }}>
+                    <div
+                      key={key}
+                      className={styles.slideOuter}
+                      style={{
+                        ...style,
+                        backgroundColor: bgColor
+                      }}
+                    >
 
-                    { currentDragIndex === i && <DropIndicator/> }
+                    { currentDragIndex === i && <DropIndicator /> }
 
                     <Motion style={motionStyle}>
                       {({ translateY, translateX, scale, zIndex }) => (
@@ -354,11 +352,10 @@ class SlideList extends Component {
                           className={styles.slideWrapper}
                           ref={(ref) => { this[data.id] = ref; }}
                           onMouseDown={this.handleMouseDown.bind(this, data.id, i)}
-                          onTouchStart={this.handleTouchStart.bind(this, data.id, i)}
                           style={{
                             zIndex,
                             border: borderStyle,
-                            position: isPressed ? "fixed" : "relative",
+                            position,
                             transform: `
                               translate3d(${translateX}px,
                               ${translateY}px, 0)
@@ -366,7 +363,11 @@ class SlideList extends Component {
                             `
                           }}
                         >
-                          <div>{data.id}</div>
+                          {
+                            (originalDragIndex !== i) ?
+                             <span className={styles.slideIndex}>{i + 1}</span> :
+                             null
+                          }
                         </div>
                       )}
                     </Motion>

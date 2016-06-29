@@ -6,6 +6,7 @@
   --secondary-border-color: #ccc;
   --primary-font-color: #3d3d3d;
   --secondary-font-color: #757575;
+  --tertiary-font-color: #999999;
 
   /* Drop Shadows */
   --drag-shadow: 0 1px 3px 0 rgba(204, 204, 204, 0.6);

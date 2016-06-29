@@ -87,10 +87,10 @@ class SlideList extends Component {
       mouseStart: [x, y],
       currentDragIndex,
       originalDragIndex,
-      isPressed
+      isPressed,
+      scrollTop
     } = this.state;
 
-    const scrollTop = this.listWrapper.scrollTop;
     const listRect = this.listWrapper.getBoundingClientRect();
 
     if (isPressed && !this.isDragging) {
@@ -103,13 +103,14 @@ class SlideList extends Component {
     const leftOfSlide = pageX + mouseOffset.left;
     const rightOfSlide = pageX + mouseOffset.right;
     const listWrapperHeight = this.listWrapper.clientHeight;
-    const scrollArea = listWrapperHeight / 5 > 30 ? listWrapperHeight / 5 : 30;
+    const scrollArea = 100;
     const topScroll = listRect.top + scrollArea;
     const bottomScroll = listRect.top + listWrapperHeight - scrollArea;
     const scrolled = newScrollTop - scrollTop;
-    const newDelta = [pageX - x, pageY - y + scrolled];
+    const newDelta = [pageX - x, pageY - y];
 
     let scrollAmount;
+
 
     if (topOfSlide < topScroll) {
       scrollAmount = -5;
@@ -118,12 +119,14 @@ class SlideList extends Component {
     } else {
       scrollAmount = null;
     }
+
+    this.setState({ scrollAmount })
+
     // Let the slide overflow halfway for the zero index location.
     if (topOfSlide < listRect.top && topOfSlide > listRect.top - (slideHeight / 2)) {
       this.setState({
         delta: newDelta,
         currentDragIndex: 0,
-        scrollAmount,
         outside: false
       });
 
@@ -140,7 +143,6 @@ class SlideList extends Component {
       this.setState({
         delta: newDelta,
         outside: true,
-        scrollAmount,
         scrollTop,
         currentDragIndex: originalDragIndex
       });
@@ -217,7 +219,6 @@ class SlideList extends Component {
       isPressed: false
     };
 
-    // TODO: allow for animations to take place before updating the store
     this.setState(state, () => {
       setTimeout(() => {
         this.isDragging = false;
@@ -231,6 +232,7 @@ class SlideList extends Component {
           outside: false, // index of component outside
           isPressed: false,
           scrollTop: null,
+          scrollAmount: null,
           updating: !outside && currentDragIndex !== originalDragIndex
         });
 
